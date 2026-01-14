@@ -17,7 +17,7 @@ import (
 	"time"
 )
 
-// --- CONFIGURACIÓN ---
+// --- CONFIGURACIÓN Y SEGURIDAD ---
 var (
 	listenAddr   string
 	rootDir      string
@@ -27,12 +27,13 @@ var (
 )
 
 type FileInfo struct {
-	Name, RelPath, HumanSize string
-	Size                     int64
-	ModTime                  time.Time
+	Name      string
+	Size      int64
+	ModTime   time.Time
+	RelPath   string
+	HumanSize string
 }
 
-// --- RATE LIMITER ---
 type RequestTracker struct {
 	lastAccess map[string]time.Time
 	mu         sync.Mutex
@@ -40,65 +41,50 @@ type RequestTracker struct {
 
 var tracker = RequestTracker{lastAccess: make(map[string]time.Time)}
 
-// --- PLANTILLA HTML (Responsive & Moderna) ---
+// Plantilla HTML integrada
 var pageTmpl = template.Must(template.New("page").Parse(`
 <!DOCTYPE html>
-<html lang="es">
+<html>
 <head>
     <meta charset="utf-8">
     <title>Cerbero-Go</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        body { font-family: system-ui, sans-serif; background: #f4f6f8; padding: 20px; color: #333; }
-        .container { max-width: 800px; margin: auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        h1 { color: #0d6efd; border-bottom: 2px solid #eee; padding-bottom: 15px; margin-top: 0; }
-        .upload-section { background: #e7f1ff; padding: 20px; border-radius: 8px; margin-bottom: 25px; border: 1px dashed #0d6efd; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th { text-align: left; padding: 12px; background: #f8f9fa; border-bottom: 2px solid #dee2e6; }
-        td { padding: 12px; border-bottom: 1px solid #dee2e6; vertical-align: middle; }
-        .btn { padding: 8px 16px; border-radius: 6px; text-decoration: none; cursor: pointer; border: none; font-weight: 600; display: inline-block; }
-        .btn-dl { background: #0d6efd; color: white; }
-        .btn-dl:hover { background: #0b5ed7; }
-        .btn-del { background: #dc3545; color: white; margin-left: 5px; }
-        .btn-del:hover { background: #bb2d3b; }
-        input[type="password"] { padding: 8px; border: 1px solid #ced4da; border-radius: 4px; margin-right: 5px; }
-        input[type="file"] { margin-bottom: 10px; display: block; width: 100%; }
-        .meta { font-size: 0.85em; color: #6c757d; }
+        body { font-family: sans-serif; background: #f0f2f5; padding: 20px; }
+        .container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1 { color: #1a73e8; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .upload-section { background: #e8f0fe; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: 12px; border-bottom: 1px solid #ddd; }
+        .btn { padding: 6px 12px; border-radius: 4px; text-decoration: none; cursor: pointer; border: none; }
+        .btn-dl { background: #1a73e8; color: white; }
+        .btn-del { background: #d93025; color: white; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Cerbero-Go <span style="font-size: 0.6em; color: #6c757d; font-weight: normal;">v1.1 Stable</span></h1>
-        
+        <h1>Cerbero-Go <small style="font-size: 12px; color: #666;">v1.0</small></h1>
         <div class="upload-section">
             <form method="POST" action="/upload" enctype="multipart/form-data">
-                <label style="font-weight:bold; display:block; margin-bottom:5px;">Subir Archivo:</label>
                 <input type="file" name="file" required>
-                <div style="margin-top:10px;">
-                    {{if .PasswordEnabled}}
-                        <input type="password" name="password" placeholder="Contraseña de acceso">
-                    {{end}}
-                    <button type="submit" class="btn btn-dl">Iniciar Subida</button>
-                </div>
+                {{if .PasswordEnabled}}<input type="password" name="password" placeholder="Contraseña">{{end}}
+                <button type="submit" class="btn btn-dl">Subir Archivo</button>
             </form>
         </div>
-
         <table>
-            <thead><tr><th>Archivo</th><th style="width:120px;">Acciones</th></tr></thead>
+            <thead><tr><th>Nombre</th><th>Tamaño</th><th>Acciones</th></tr></thead>
             <tbody>
                 {{range .Files}}
                 <tr>
+                    <td>{{.Name}}</td>
+                    <td>{{.HumanSize}}</td>
                     <td>
-                        <div style="font-weight:bold;">{{.Name}}</div>
-                        <div class="meta">{{.HumanSize}} - {{.ModTime.Format "02/01/2006 15:04"}}</div>
-                    </td>
-                    <td>
-                        <a href="/download/{{.RelPath}}" class="btn btn-dl">▼</a>
+                        <a href="/download/{{.RelPath}}" class="btn btn-dl">Descargar</a>
                         {{if $.EnableDelete}}
                         <form method="POST" action="/delete" style="display:inline;">
                             <input type="hidden" name="path" value="{{.RelPath}}">
-                            {{if $.PasswordEnabled}}<input type="password" name="password" placeholder="Clave" style="width:60px; padding:6px;">{{end}}
-                            <button type="submit" class="btn btn-del" onclick="return confirm('¿Eliminar {{.Name}}?')">🗑</button>
+                            {{if $.PasswordEnabled}}<input type="password" name="password" placeholder="Clave" style="width:60px;">{{end}}
+                            <button type="submit" class="btn btn-del">X</button>
                         </form>
                         {{end}}
                     </td>
@@ -110,23 +96,25 @@ var pageTmpl = template.Must(template.New("page").Parse(`
 </body>
 </html>`))
 
-// --- FUNCIONES UTILITARIAS ---
+// --- FUNCIONES DE APOYO ---
 
 func humanSize(n int64) string {
-	sizes := []string{"B", "KB", "MB", "GB", "TB"}
-	f, i := float64(n), 0
+	sizes := []string{"B", "KB", "MB", "GB"}
+	f := float64(n)
+	i := 0
 	for f >= 1024 && i < len(sizes)-1 {
 		f /= 1024
 		i++
 	}
-	return fmt.Sprintf("%.2f %s", f, sizes[i])
+	return fmt.Sprintf("%.1f %s", f, sizes[i])
 }
 
 func isRateLimited(ip string) bool {
 	tracker.mu.Lock()
 	defer tracker.mu.Unlock()
-	if last, exists := tracker.lastAccess[ip]; exists && time.Since(last) < 500*time.Millisecond {
-		return true // Bloquea si hay más de 2 peticiones por segundo
+	last, exists := tracker.lastAccess[ip]
+	if exists && time.Since(last) < 1*time.Second {
+		return true
 	}
 	tracker.lastAccess[ip] = time.Now()
 	return false
@@ -136,24 +124,23 @@ func securePath(requestedPath string) (string, error) {
 	absRoot, _ := filepath.Abs(rootDir)
 	targetPath := filepath.Join(absRoot, filepath.Clean("/"+requestedPath))
 	if !strings.HasPrefix(targetPath, absRoot) {
-		return "", fmt.Errorf("acceso denegado: intento de path traversal")
+		return "", fmt.Errorf("acceso denegado")
 	}
 	return targetPath, nil
 }
 
 func checkPassword(r *http.Request) bool {
 	if password == "" { return true }
-	return subtle.ConstantTimeCompare([]byte(r.FormValue("password")), []byte(password)) == 1
+	sent := r.FormValue("password")
+	return subtle.ConstantTimeCompare([]byte(sent), []byte(password)) == 1
 }
 
 // --- HANDLERS ---
 
 func renderIndex(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" { http.NotFound(w, r); return }
-	
 	entries, err := os.ReadDir(rootDir)
 	if err != nil {
-		http.Error(w, "Error leyendo el directorio raíz", 500)
+		http.Error(w, "Error leyendo carpeta", 500)
 		return
 	}
 
@@ -169,136 +156,67 @@ func renderIndex(w http.ResponseWriter, r *http.Request) {
 			ModTime:   info.ModTime(),
 		})
 	}
-	
-	// Ordenar por fecha (más reciente primero)
+
 	sort.Slice(files, func(i, j int) bool { return files[i].ModTime.After(files[j].ModTime) })
 
-	pageTmpl.Execute(w, map[string]interface{}{
+	data := map[string]interface{}{
 		"Files":           files,
 		"EnableDelete":    enableDelete,
 		"PasswordEnabled": password != "",
-	})
+	}
+	pageTmpl.Execute(w, data)
 }
 
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	host, _, _ := net.SplitHostPort(r.RemoteAddr)
-	if isRateLimited(host) {
-		http.Error(w, "Demasiadas peticiones (Rate Limit)", 429)
-		return
-	}
+	if isRateLimited(host) { http.Error(w, "Límite excedido", 429); return }
+	if r.Method != "POST" { http.Error(w, "Error", 405); return }
+	if !checkPassword(r) { http.Error(w, "Clave errónea", 401); return }
 
-	// 1. Establecer límite estricto de lectura
 	r.Body = http.MaxBytesReader(w, r.Body, int64(maxUploadMB)<<20)
-
-	// 2. PARSEAR FORMULARIO (CRUCIAL: Esto descarga el archivo al temp antes de validar lógica)
-	// Usamos 32MB de buffer en RAM, el resto va a disco temporal.
-	if err := r.ParseMultipartForm(32 << 20); err != nil {
-		if strings.Contains(err.Error(), "request body too large") {
-			http.Error(w, fmt.Sprintf("El archivo excede el límite de %d MB", maxUploadMB), 413)
-		} else {
-			http.Error(w, "Error al procesar la subida (¿Disco lleno o conexión cortada?)", 400)
-		}
-		return
-	}
-
-	// 3. Verificar contraseña AHORA (ya tenemos los campos del form seguros)
-	if !checkPassword(r) {
-		http.Error(w, "Contraseña incorrecta", 401)
-		return
-	}
-
-	// 4. Recuperar el archivo procesado
 	file, header, err := r.FormFile("file")
-	if err != nil {
-		http.Error(w, "No se seleccionó ningún archivo", 400)
-		return
-	}
+	if err != nil { http.Error(w, "Error", 400); return }
 	defer file.Close()
 
-	// 5. Guardar en destino final
-	dstPath, err := securePath(filepath.Base(header.Filename))
-	if err != nil {
-		http.Error(w, "Nombre de archivo inválido", 403)
-		return
-	}
-
-	dst, err := os.Create(dstPath)
-	if err != nil {
-		log.Printf("Error creando archivo: %v", err)
-		http.Error(w, "Error de escritura en el servidor", 500)
-		return
-	}
+	dstPath, _ := securePath(filepath.Base(header.Filename))
+	dst, _ := os.Create(dstPath)
 	defer dst.Close()
+	io.Copy(dst, file)
+	http.Redirect(w, r, "/", 303)
+}
 
-	if _, err := io.Copy(dst, file); err != nil {
-		log.Printf("Error guardando datos: %v", err)
-		http.Error(w, "Error durante el guardado", 500)
-		return
-	}
+func downloadHandler(w http.ResponseWriter, r *http.Request) {
+	rel := strings.TrimPrefix(r.URL.Path, "/download/")
+	abs, err := securePath(rel)
+	if err != nil { http.Error(w, "Denegado", 403); return }
+	http.ServeFile(w, r, abs)
+}
 
-	log.Printf("[UPLOAD] %s subido exitosamente desde %s", header.Filename, host)
+func deleteHandler(w http.ResponseWriter, r *http.Request) {
+	if !enableDelete { return }
+	if !checkPassword(r) { http.Error(w, "Clave errónea", 401); return }
+	path, err := securePath(r.FormValue("path"))
+	if err == nil { os.Remove(path) }
 	http.Redirect(w, r, "/", 303)
 }
 
 func main() {
-	// Definición de flags
-	flag.StringVar(&listenAddr, "listen", ":8080", "Dirección IP y puerto (ej: :8080)")
-	flag.StringVar(&rootDir, "root", "./archivos", "Carpeta donde se guardan los archivos")
-	flag.IntVar(&maxUploadMB, "maxmb", 512, "Límite máximo de subida en MB")
-	flag.StringVar(&password, "password", "", "Contraseña para proteger subidas/borrados")
-	flag.BoolVar(&enableDelete, "delete", true, "Permitir borrar archivos (true/false)")
+	flag.StringVar(&listenAddr, "listen", ":8080", "Puerto")
+	flag.StringVar(&rootDir, "root", "./shared", "Carpeta")
+	flag.IntVar(&maxUploadMB, "maxmb", 512, "Límite")
+	flag.StringVar(&password, "password", "", "Clave")
+	flag.BoolVar(&enableDelete, "delete", true, "Borrado")
 	flag.Parse()
 
-	// Configuración de rutas
-	absPath, err := filepath.Abs(rootDir)
-	if err != nil {
-		log.Fatal("Error resolviendo ruta raíz:", err)
-	}
-	rootDir = absPath
+	abs, _ := filepath.Abs(rootDir)
+	rootDir = abs
+	os.MkdirAll(rootDir, 0755)
 
-	if err := os.MkdirAll(rootDir, 0755); err != nil {
-		log.Fatal("No se pudo crear el directorio raíz:", err)
-	}
-
-	// Routers
 	http.HandleFunc("/", renderIndex)
 	http.HandleFunc("/upload", uploadHandler)
-	http.HandleFunc("/download/", func(w http.ResponseWriter, r *http.Request) {
-		relPath := strings.TrimPrefix(r.URL.Path, "/download/")
-		absPath, err := securePath(relPath)
-		if err != nil {
-			http.Error(w, "Acceso Prohibido", 403)
-			return
-		}
-		http.ServeFile(w, r, absPath)
-	})
-	http.HandleFunc("/delete", func(w http.ResponseWriter, r *http.Request) {
-		if !enableDelete {
-			http.Error(w, "El borrado está deshabilitado", 403)
-			return
-		}
-		if r.Method == "POST" && checkPassword(r) {
-			path := r.FormValue("path")
-			if target, err := securePath(path); err == nil {
-				os.Remove(target)
-				log.Printf("[DELETE] %s eliminado", filepath.Base(target))
-			}
-		}
-		http.Redirect(w, r, "/", 303)
-	})
+	http.HandleFunc("/download/", downloadHandler)
+	http.HandleFunc("/delete", deleteHandler)
 
-	fmt.Println("------------------------------------------------------")
-	fmt.Printf("  Cerbero-Go v1.1 iniciado correctamente\n")
-	fmt.Printf(" Directorio: %s\n", rootDir)
-	fmt.Printf(" Escuchando: http://localhost%s\n", listenAddr)
-	if password != "" {
-		fmt.Println(" Modo: PRIVADO (Requiere contraseña)")
-	} else {
-		fmt.Println("  Modo: PÚBLICO (Sin contraseña)")
-	}
-	fmt.Println("------------------------------------------------------")
-	
-	if err := http.ListenAndServe(listenAddr, nil); err != nil {
-		log.Fatal("Error al iniciar servidor:", err)
-	}
+	log.Printf("Cerbero-Go en puerto %s protegiendo %s", listenAddr, rootDir)
+	log.Fatal(http.ListenAndServe(listenAddr, nil))
 }
