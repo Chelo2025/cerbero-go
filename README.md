@@ -28,7 +28,6 @@ Está diseñado para ser **ligero, reproducible y seguro**, ideal para homelabs,
 
 ## Instalación en Debian 13
 
-```bash
 # 1. Instalar Go y herramientas necesarias
 su -c "apt update && apt upgrade"
 su -c "apt install golang git -y"
