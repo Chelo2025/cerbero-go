@@ -1,4 +1,4 @@
-# Cerbero-Go v1.0
+# Cerbero-Go
 
 ## Descripción
 Cerbero-Go es un servidor HTTP escrito en **Go**, con interfaz web integrada, que permite **subir, descargar y borrar archivos** de manera segura.  
