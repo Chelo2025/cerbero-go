@@ -30,10 +30,12 @@ Está diseñado para ser **ligero, reproducible y seguro**, ideal para homelabs,
 
 # 1. Instalar Go y herramientas necesarias
 su -c "apt update && apt upgrade"
+
 su -c "apt install golang git -y"
 
 # 2. Clonar el repositorio
 git clone https://github.com/Chelo2025/Cerbero-Go
+
 cd Cerbero-Go
 
 # 3. Compilar el proyecto
