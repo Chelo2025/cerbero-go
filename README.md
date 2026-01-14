@@ -34,7 +34,7 @@ su -c "apt update && apt upgrade"
 su -c "apt install golang git -y"
 
 # 2. Clonar el repositorio
-git clone https://github.com/Chelo2025/Cerbero-Go
+git clone https://github.com/Chelo2025/cerbero-go
 
 cd Cerbero-Go
 
