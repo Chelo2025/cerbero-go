@@ -36,7 +36,7 @@ su -c "apt install golang git -y"
 # 2. Clonar el repositorio
 git clone https://github.com/Chelo2025/cerbero-go
 
-cd Cerbero-Go
+cd cerbero-go
 
 # 3. Compilar el proyecto
 go build -o cerbero-go main.go
