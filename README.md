@@ -43,6 +43,8 @@ go build -o cerbero-go main.go
 # 4. Ejecutar con parámetros personalizados
 ./cerbero-go -root ./archivos -listen :8080 -password "miclave"
 
+---
+
 ## Prueba de funcionamiento
 
 Abrir el navegador en http://localhost:8080
@@ -50,6 +52,8 @@ Abrir el navegador en http://localhost:8080
 Subir un archivo desde la interfaz web.
 
 Descargarlo o borrarlo según permisos configurados.
+
+---
 
 ## Autor
 
